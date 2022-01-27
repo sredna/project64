@@ -1226,7 +1226,7 @@ LRESULT CALLBACK CMainGui::MainGui_Proc(HWND hWnd, UINT uMsg, WPARAM wParam, LPA
     return TRUE;
 }
 
-static static BOOL CALLBACK FindOtherInstanceWindowEnumProc(HWND hWnd, LPARAM param)
+static BOOL CALLBACK FindOtherInstanceWindowEnumProc(HWND hWnd, LPARAM param)
 {
     SIZE_T *data = (SIZE_T*) param;
     WCHAR buf[200];
