@@ -16,6 +16,7 @@ static void FixDirectories(void);
 void SetTraceModuleNames(void);
 
 #ifdef _WIN32
+#include <Project64\UserInterface\MainWindow.h>
 static void IncreaseThreadPriority(void);
 #endif
 
@@ -173,11 +174,13 @@ const char * AppName(void)
     return ApplicationName.c_str();
 }
 
-static bool ParseCommand(int32_t argc, char **argv)
+enum { PARSECMD_SUCCESS = 0x01, PARSECMD_REUSEINSTANCE = 0x02 };
+static unsigned int ParseCommand(int32_t argc, char **argv)
 {
+    unsigned int flags = 0;
     if (argc <= 1)
     {
-        return true;
+        return PARSECMD_SUCCESS|flags;
     }
     for (int32_t i = 1; i < argc; i++)
     {
@@ -186,6 +189,10 @@ static bool ParseCommand(int32_t argc, char **argv)
         {
             g_Settings->SaveBool(Cmd_ShowHelp, true);
             return false;
+        }
+        else if (strcmp(argv[i], "--reuse") == 0)
+        {
+            flags |= PARSECMD_REUSEINSTANCE;
         }
         else if (strcmp(argv[i], "--combo") == 0)
         {
@@ -203,7 +210,7 @@ static bool ParseCommand(int32_t argc, char **argv)
         else if (ArgsLeft == 0 && argv[i][0] != '-')
         {
             g_Settings->SaveString(Cmd_RomFile, &(argv[i][0]));
-            return true;
+            return PARSECMD_SUCCESS|flags;
         }
         else
         {
@@ -230,14 +237,31 @@ bool AppInit(CNotification * Notify, const char * BaseDirectory, int argc, char 
         g_Settings->Initialize(BaseDirectory, AppName());
 
         WriteTrace(TraceAppInit, TraceDebug, "Parse commands");
-        if (!ParseCommand(argc, argv))
+        unsigned int parseflags = ParseCommand(argc, argv);
+        if (!(parseflags & PARSECMD_SUCCESS))
         {
             WriteTrace(TraceAppInit, TraceError, "Failed to parse commands, exiting now");
             return false;
         }
 
 #ifdef _WIN32
-        if (g_Settings->LoadBool(Setting_CheckEmuRunning) &&
+        if ((parseflags & PARSECMD_REUSEINSTANCE))
+        {
+            bool quit = false;
+            HWND hWnd = FindOtherInstanceWindow();
+            if (hWnd)
+            {
+                if (g_Settings->LoadStringVal(Cmd_RomFile).length() > 0)
+                    quit = LoadInOtherInstance(hWnd, g_Settings->LoadStringVal(Cmd_RomFile).c_str());
+                else
+                    quit = true;
+                
+                if (quit)
+                    ::SetForegroundWindow(hWnd);
+            }
+            if (quit) ExitProcess(0);
+        }
+        else if (g_Settings->LoadBool(Setting_CheckEmuRunning) &&
             pjutil::TerminatedExistingExe())
         {
             delete g_Settings;
